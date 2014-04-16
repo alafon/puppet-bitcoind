@@ -59,9 +59,13 @@ class bitcoind::source (
         ensure => directory,
     }
 
+    $branchoption = $gitbranch ? {
+        'master' => '',
+        default => "-b ${gitbranch}"
+    }
     exec { "git clone bitcoin":
         path      => "/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/usr/bin:/usr/sbin:/bin:/sbin:.",
-        command   => "git clone ${repository} ${clone_path}",
+        command   => "git clone ${branchoption} ${repository} ${clone_path}",
         creates   => "${clone_path}/.git",
         logoutput => true
     }
