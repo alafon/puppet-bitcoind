@@ -4,13 +4,18 @@
 #
 class bitcoind::source (
 
-    $walletEnabled = false
+    $gitbranch = 'master',
+    $walletEnabled = false,
+    $debug = false
 
     ) {
+
     include bitcoind::params
 
     notify{"Starting build of bitcoind.... This may take a while": }
-    notify{"NOTE:If you get an error at this stage, enlarge the swap file to 1GB. See - https://bitcointalk.org/index.php?topic=110627.0": }
+    if $debug {
+        notify{"NOTE:If you get an error at this stage, enlarge the swap file to 1GB. See - https://bitcointalk.org/index.php?topic=110627.0": }
+    }
 
     # 1GB SWAPFILE CODE
     #
@@ -31,7 +36,8 @@ class bitcoind::source (
         "autoconf",
         "libssl-dev",
         "libboost-all-dev",
-        "libminiupnpc-dev"
+        "libminiupnpc-dev",
+        "pkg-config"
     ]
 
     package { $requires:
@@ -59,12 +65,12 @@ class bitcoind::source (
         creates   => "${clone_path}/.git",
         logoutput => true
     }
-
     exec { "bitcoin-autogen":
         path      => "/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/usr/bin:/usr/sbin:/bin:/sbin:.",
         command   => "./autogen.sh",
+        creates   => "${clone_path}/configure",
         cwd       => "${clone_path}",
-        logoutput => true,
+        logoutput => on_failure,
         timeout   => 0,
     }
 
@@ -78,17 +84,17 @@ class bitcoind::source (
         command   => "./configure ${configureOptions}",
         creates   => "${clone_path}/src/bitcoind",
         cwd       => "${clone_path}",
-        logoutput => true,
+        logoutput => on_failure,
         timeout   => 0,
     }
 
     exec { "bitcoin-make":
-        require   => Exec["bitcoin-configure"]
+        require   => Exec["bitcoin-configure"],
         path      => "/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/usr/bin:/usr/sbin:/bin:/sbin:.",
         command   => "make",
         creates   => "${clone_path}/src/bitcoind",
         cwd       => "${clone_path}",
-        logoutput => true,
+        logoutput => on_failure,
         timeout   => 0,
     }
 
