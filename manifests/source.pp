@@ -4,7 +4,8 @@
 #
 class bitcoind::source (
 
-    $gitbranch = 'master'
+    $gitbranch = 'master',
+    $walletEnabled = false
 
     ) {
 
@@ -20,20 +21,34 @@ class bitcoind::source (
     # sudo swapon /swapfile
 
     $repository = "git://github.com/bitcoin/bitcoin.git"
-    $requires   = [
-        "git",
-        "build-essential",
-        "libssl-dev",
-        "libboost-all-dev",
-        "libdb-dev",
-        "libdb++-dev",
-        "libminiupnpc-dev"
-    ]
     $clone_path = "/opt/bitcoin"
     $install_path = "/usr/bin"
 
+    # Default required packages
+    $requires   = [
+        "git",
+        "build-essential",
+        "libtool",
+        "autotools-dev",
+        "autoconf",
+        "libssl-dev",
+        "libboost-all-dev",
+        "libminiupnpc-dev"
+    ]
+
     package { $requires:
         ensure => present,
+    }
+
+    # Berkeley DB 4.8 is only required for
+    if $walletEnabled {
+        $requires = [
+            "libdb4.8-dev",
+            "libdb4.8++-dev"
+        ]
+        package { $requires:
+            ensure => present
+        }
     }
 
     file { $clone_path:
@@ -51,11 +66,34 @@ class bitcoind::source (
         logoutput => true
     }
 
-    exec { "make bitcoin":
+    exec { "bitcoin-autogen":
         path      => "/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/usr/bin:/usr/sbin:/bin:/sbin:.",
-        command   => "make -f makefile.unix",
+        command   => "./autogen.sh",
+        cwd       => "${clone_path}",
+        logoutput => true,
+        timeout   => 0,
+    }
+
+    $configureOptions = $walletEnabled ? {
+        false => '--disable-wallet',
+        true => ''
+    }
+    exec { "bitcoin-configure":
+        require   => Exec["bitcoin-autogen"],
+        path      => "/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/usr/bin:/usr/sbin:/bin:/sbin:.",
+        command   => "./configure ${configureOptions}",
         creates   => "${clone_path}/src/bitcoind",
-        cwd       => "${clone_path}/src",
+        cwd       => "${clone_path}",
+        logoutput => true,
+        timeout   => 0,
+    }
+
+    exec { "bitcoin-make":
+        require   => Exec["bitcoin-configure"]
+        path      => "/usr/local/bin:/usr/local/sbin:/usr/X11R6/bin:/usr/bin:/usr/sbin:/bin:/sbin:.",
+        command   => "make",
+        creates   => "${clone_path}/src/bitcoind",
+        cwd       => "${clone_path}",
         logoutput => true,
         timeout   => 0,
     }
